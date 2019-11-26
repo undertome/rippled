@@ -144,3 +144,17 @@ void SSLHTTPDownloader::do_session()
 
 ##### Note:
 To resume downloading after a pause, as an alternative to using flow control, we could also refactor the connection and download initialization logic into a separate method that gets invoked at the beginning of `do_session()` and after waking.
+
+### Recovery
+In order to provide resilience, the downloader will utilize the filesystem to preserve its current state whenever there are active, paused, or queued downloads. A new section in the configuration file will be provided to specify the location of the file to use for this purpose.
+
+##### Config File Entry
+
+```
+# File for tracking the internal state of the downloader. Used to recover
+# incomplete and queued downloads when restarting after a crash or shutdown.
+# Unless an absolute path is specified, it will be considered relative to the
+# folder in which the rippled.cfg file is located.
+[downloader_file]
+downloader.json
+```
