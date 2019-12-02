@@ -11,12 +11,24 @@ SSL HTTP. The downloader utilizes a strand (`boost::asio::io_service::strand`) t
 - The ability to resume downloads after a software crash.
 - <span style="color:gray">*(Deferred) The ability to download from multiple servers to a single file.*</span>
 
-## Implementation Details
+## Classes
+
+Implementing the shard downloader improvements will require making changes to the following classes:
+
+- `SSLHTTPDownloader`
+
+ This is a generic class designed for serially executing downloads via HTTP SSL.
+
+- `ShardArchiveHandler`
+
+ This class uses the `SSLHTTPDownloader` to fetch shards from remote web servers. Additionally, the archive handler performs sanity checks on the downloaded files and imports the validated files into the local shard store.
+
+## Execution Concept
 
 This section describes in greater detail how the new features will be
 implemented in C++ using the `boost::asio` framework.
 
-#### Member Variables:
+##### Member Variables:
 
 The variables shown here are members of the `SSLHTTPDownloader` class and
 will be used in the following code examples.
@@ -143,13 +155,13 @@ void SSLHTTPDownloader::do_session()
 ```
 
 ##### Note:
-To resume downloading after a pause, as an alternative to using flow control, we could also refactor the connection and download initialization logic into a separate method that gets invoked at the beginning of `do_session()` and after waking.
+To resume downloading after a pause, as an alternative to using flow control, we could also refactor the connection and download initialization logic into a separate method that gets invoked at the beginning of `do_session()` and after waking. This is the preferred approach.
 
 ### Recovery
 Although `SSLHTTPDownloader` is a generic class that could be used to download a variety of file types, currently it is used exclusively by the `ShardArchiveHandler` to download shards. In order to provide resilience, the `ShardArchiveHandler` will utilize the filesystem to preserve its current state whenever there are active, paused, or queued downloads. The `shard_db` section in the configuration file allows users to specify the location of the file to use for this purpose.
 
 ##### Config File Entry
-The `path` field of the `shard_db` entry will be used to determine where to store the download recovery file.
+The `path` field of the `shard_db` entry will be used to determine where to store the download recovery file. In addition, a new field named `download_path` will be provided to allow users to provide a separate path for storing downloads and the state file.
 
 ```dosini
 # This is the persistent datastore for shards. It is important for the health
@@ -162,8 +174,39 @@ path=/var/lib/rippled/db/shards/nudb
 max_size_gb=50
 ```
 
+#### Resuming Partial Downloads
+When resuming downloads after a crash or other interruption, the `SSLHTTPDownloader` will utilize the `range` field of the HTTP header to download only the remainder of the partially downloaded file.
 
-## Use Case Sequence
+```C++
+auto downloaded = getPartialFileSize();
+auto total = getTotalFileSize();
+
+http::request<http::empty_body> req {http::verb::head,
+  target,
+  version};
+
+if (downloaded < total)
+{
+  // If we already download 1000 bytes to the partial file,
+  // the range header will look like:
+  // Range: "bytes=1000-"
+  req.set(http::field::range, "bytes=" + to_string(downloaded) + "-");
+}
+else if(downloaded == total)
+{
+  // Download is already complete. (Interruption Must
+  // have occurred after file was downloaded but before
+  // the state file was updated.)
+}
+else
+{
+  // The size of the partially downloaded file exceeds
+  // the total download size. Error condition. Handle
+  // appropriately.
+}
+```
+
+## Sequence Diagram
 
 This sequence diagram demonstrates a scenario wherein the `ShardArchiveHandler` leverages the state persisted on the filesystem to recover from a crash and resume the scheduled downloads.
 

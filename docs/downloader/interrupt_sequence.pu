@@ -1,12 +1,14 @@
 @startuml
 
-/'
+
 skinparam shadowing false
 
+/'
 skinparam sequence {
 	ArrowColor #e1e4e8
 	ActorBorderColor #e1e4e8
-	LifeLineBorderColor #d3d6d9
+	DatabaseBorderColor #e1e4e8
+	LifeLineBorderColor Black
 	LifeLineBackgroundColor #d3d6d9
 
 	ParticipantBorderColor DeepSkyBlue
@@ -16,7 +18,23 @@ skinparam sequence {
 	ParticipantFontColor #A9DCDF
 
   NoteBackgroundColor #6a737d
+
 	ActorBackgroundColor #f6f8fa
+	ActorFontColor #6a737d
+	ActorFontSize 17
+	ActorFontName Aapex
+
+	EntityBackgroundColor #f6f8fa
+	EntityFontColor #6a737d
+	EntityFontSize 17
+	EntityFontName Aapex
+
+	DatabaseBackgroundColor #f6f8fa
+	DatabaseFontColor #6a737d
+	DatabaseFontSize 17
+	DatabaseFontName Aapex
+
+	CollectionsBackgroundColor #f6f8fa
 	ActorFontColor #6a737d
 	ActorFontSize 17
 	ActorFontName Aapex
@@ -27,6 +45,8 @@ skinparam note {
   BorderColor #e1e4e8
 }
 '/
+
+skinparam monochrome true
 
 actor Client as c
 entity RippleNode as rn
@@ -89,6 +109,14 @@ sa -> d: Create instance of SSLHTTPDownloader
 activate d
 
 group Download 1
+
+  note over sa
+    **Download 1:**
+
+    This encapsulates the download of the first file
+    at URL "https://example.com/1.tar.lz4".
+
+  end note
 
   sa -> d: Start download
 
