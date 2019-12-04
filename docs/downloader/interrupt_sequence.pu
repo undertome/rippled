@@ -52,7 +52,7 @@ actor Client as c
 entity RippleNode as rn
 entity ShardArchiveHandler as sa
 entity SSLHTTPDownloader as d
-database Filesystem as fs
+database Database as db
 collections Fileserver as s
 
 c -> rn: Launch RippleNode
@@ -79,7 +79,7 @@ note right of c
   }
 end note
 
-rn -> sa: Create instance of ShardArchiveHandler
+rn -> sa: Create instance of Handler
 activate sa
 
 rn -> sa: Add three downloads
@@ -89,23 +89,20 @@ rn -> sa: Initiate Downloads
 sa -> rn: ACK: Initiating
 rn -> c: Initiating requested downloads
 
-sa -> fs: Save state to the filesystem\n(Processing three downloads)
+sa -> db: Save state to the database\n(Processing three downloads)
 
-note right of fs
-  **State File (Tentative Format):**
+note right of db
 
-  {
-    "downloads":
-    [
-      {"index": 1, "url": "https://example.com/1.tar.lz4"},
-      {"index": 2, "url": "https://example.com/2.tar.lz4"},
-      {"index": 5, "url": "https://example.com/5.tar.lz4"}
-    ]
-  }
+  **ArchiveHandler State (SQLite Table):**
+
+  | Index | URL                           |
+  | 1     | https://example.com/1.tar.lz4 |
+  | 2     | https://example.com/2.tar.lz4 |
+  | 5     | https://example.com/5.tar.lz4 |
 
 end note
 
-sa -> d: Create instance of SSLHTTPDownloader
+sa -> d: Create instance of Downloader
 activate d
 
 group Download 1
@@ -128,18 +125,14 @@ end
 
 sa -> sa: Import and validate shard
 
-sa -> fs: Update persisted state\n(Remove download)
+sa -> db: Update persisted state\n(Remove download)
 
-note right of fs
-  **State File:**
+note right of db
+  **ArchiveHandler State:**
 
-  {
-    "downloads":
-    [
-      {"index": 2, "url": "https://example.com/2.tar.lz4"},
-      {"index": 5, "url": "https://example.com/5.tar.lz4"}
-    ]
-  }
+  | Index | URL                           |
+  | 2     | https://example.com/2.tar.lz4 |
+  | 5     | https://example.com/5.tar.lz4 |
 
 end note
 
@@ -160,27 +153,23 @@ deactivate d
 c -> rn: Restart RippleNode
 activate rn
 
-rn -> fs: Detects non-empty state file
+rn -> db: Detect non-empty state database
 
-rn -> sa: Create instance of ShardArchiveHandler
+rn -> sa: Create instance of Handler
 activate sa
 
-sa -> fs: Load state file
+sa -> db: Load state
 
-note right of fs
-  **State File:**
+note right of db
+  **ArchiveHandler State:**
 
-  {
-    "downloads":
-    [
-      {"index": 2, "url": "https://example.com/2.tar.lz4"},
-      {"index": 5, "url": "https://example.com/5.tar.lz4"}
-    ]
-  }
+  | Index | URL                           |
+  | 2     | https://example.com/2.tar.lz4 |
+  | 5     | https://example.com/5.tar.lz4 |
 
 end note
 
-sa -> d: Create instance of SSLHTTPDownloader
+sa -> d: Create instance of Downloader
 activate d
 
 sa -> sa: Resume Download 2
@@ -197,17 +186,13 @@ end
 
 sa -> sa: Import and validate shard
 
-sa -> fs: Update persisted state \n(Remove download)
+sa -> db: Update persisted state \n(Remove download)
 
-note right of fs
-  **State File:**
+note right of db
+  **ArchiveHandler State:**
 
-  {
-    "downloads":
-    [
-      {"index": 5, "url": "https://example.com/5.tar.lz4"}
-    ]
-  }
+  | Index | URL                           |
+  | 5     | https://example.com/5.tar.lz4 |
 
 end note
 
@@ -223,18 +208,16 @@ end
 
 sa -> sa: Import and validate shard
 
-sa -> fs: Update persisted state \n(Remove download)
+sa -> db: Update persisted state \n(Remove download)
 
-note right of fs
-  **State File:**
+note right of db
+  **ArchiveHandler State:**
 
-  {
-    "downloads": []
-  }
+  ***empty***
 
 end note
 
-sa -> fs: Remove empty state file
+sa -> db: Remove empty database
 
 sa -> sa: Automatically destroyed
 deactivate sa

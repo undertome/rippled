@@ -17,11 +17,15 @@ Implementing the shard downloader improvements will require making changes to th
 
 - `SSLHTTPDownloader`
 
- This is a generic class designed for serially executing downloads via HTTP SSL.
+   This is a generic class designed for serially executing downloads via HTTP SSL.
 
 - `ShardArchiveHandler`
 
- This class uses the `SSLHTTPDownloader` to fetch shards from remote web servers. Additionally, the archive handler performs sanity checks on the downloaded files and imports the validated files into the local shard store.
+   This class uses the `SSLHTTPDownloader` to fetch shards from remote web servers. Additionally, the archive handler performs sanity checks on the downloaded files and imports the validated files into the local shard store.
+
+- `SQLiteBody`
+
+   This is a new class that defines a custom message body type, allowing an `http::response_parser` to write to a SQLite database rather than to a flat file. This class is discussed in further detail in the Recovery section.
 
 ##### ShardArchiveHandler
 The `ShardArchiveHandler` exposes a simple public interface:
@@ -178,10 +182,37 @@ void SSLHTTPDownloader::do_session()
 To resume downloading after a pause, as an alternative to using flow control, we could also refactor the connection and download initialization logic into a separate method that gets invoked at the beginning of `do_session()` and after waking. This is the preferred approach.
 
 ### Recovery
-Although `SSLHTTPDownloader` is a generic class that could be used to download a variety of file types, currently it is used exclusively by the `ShardArchiveHandler` to download shards. In order to provide resilience, the `ShardArchiveHandler` will utilize the filesystem to preserve its current state whenever there are active, paused, or queued downloads. The `shard_db` section in the configuration file allows users to specify the location of the file to use for this purpose.
+
+Persisting the current state of both the archive handler and the downloader is achieved by leveraging a SQLite database rather than flat files, as the database protects against data corruption that could result from a system crash.
+
+##### ShardArchiveHandler
+
+Although `SSLHTTPDownloader` is a generic class that could be used to download a variety of file types, currently it is used exclusively by the `ShardArchiveHandler` to download shards. In order to provide resilience, the `ShardArchiveHandler` will utilize a SQLite database to preserve its current state whenever there are active, paused, or queued downloads. The `shard_db` section in the configuration file allows users to specify the location of the database to use for this purpose.
+
+###### SQLite Table Format
+
+| Index | URL                                 |
+|:-----:|:-----------------------------------:|
+| 1     | ht<span>tps://example.com/1.tar.lz4 |
+| 2     | ht<span>tps://example.com/2.tar.lz4 |
+| 5     | ht<span>tps://example.com/5.tar.lz4 |
+
+##### SSLHTTPDownloader
+
+While the archive handler maintains a list of all partial and queued downloads, the `SSLHTTPDownloader` stores the raw bytes of the file currently being downloaded. The partially downloaded file will be represented as one or more `BLOB` entries in a SQLite database. As the maximum size of a `BLOB` entry is currently limited to roughly 2.1 GB, a 5 GB shard file for instance will occupy three database entries upon completion.
+
+###### SQLite Table Format
+
+Since downloads execute serially by design, the entries in this table always correspond to the content of a single file.
+
+| Bytes  | Size       | Part |
+|:------:|:----------:|:----:|
+| 0x...  | 2147483647 | 0    |
+| 0x...  | 2147483647 | 1    |
+| 0x...  | 705032706  | 2    |
 
 ##### Config File Entry
-The `path` field of the `shard_db` entry will be used to determine where to store the download recovery file. In addition, a new field named `download_path` will be provided to allow users to provide a separate path for storing downloads and the state file.
+The `download_path` field of the `shard_db` entry will be used to determine where to store the recovery database. If this field is omitted, the `path` field will be used instead.
 
 ```dosini
 # This is the persistent datastore for shards. It is important for the health
@@ -191,17 +222,18 @@ The `path` field of the `shard_db` entry will be used to determine where to stor
 [shard_db]
 type=NuDB
 path=/var/lib/rippled/db/shards/nudb
+download_path=/var/lib/rippled/db/shards/
 max_size_gb=50
 ```
 
-#### Resuming Partial Downloads
+##### Resuming Partial Downloads
 When resuming downloads after a crash or other interruption, the `SSLHTTPDownloader` will utilize the `range` field of the HTTP header to download only the remainder of the partially downloaded file.
 
 ```C++
 auto downloaded = getPartialFileSize();
 auto total = getTotalFileSize();
 
-http::request<http::empty_body> req {http::verb::head,
+http::request<http::file_body> req {http::verb::head,
   target,
   version};
 
@@ -226,8 +258,40 @@ else
 }
 ```
 
+##### SQLiteBody
+
+Currently, the `SSLHTTPDownloader` leverages a `http::response_parser` instantiated with a `http::file_body`. The `file_body` class declares a nested type, `reader`, which does the task of writing HTTP message payloads (constituting a requested file) to the filesystem. In order for the `http::response_parser` to interface with the database, we implement a custom body type that declares a nested `reader` type which has been outfitted to persist octects received from the remote host to a local SQLite database. The code snippet below illustrates the customization points available to user-defined body types:
+
+```C++
+/// Defines a Body type
+struct body
+{
+    /// This determines the return type of the `message::body` member function
+    using value_type = ...;
+
+    /// An optional function, returns the body's payload size (which may be zero)
+    static
+    std::uint64_t
+    size(value_type const& v);
+
+    /// The algorithm used for extracting buffers
+    class reader;
+
+    /// The algorithm used for inserting buffers
+    class writer;
+}
+
+```
+
+The method invoked to write data to the filesystem (or SQLite database in our case) has the following signature:
+
+```C++
+std::size_t
+body::reader::put(ConstBufferSequence const& buffers, error_code& ec);
+```
+
 ## Sequence Diagram
 
 This sequence diagram demonstrates a scenario wherein the `ShardArchiveHandler` leverages the state persisted on the filesystem to recover from a crash and resume the scheduled downloads.
 
-![alt_text](./interrupt_sequence.png "image_tooltip")
+![alt_text](./interrupt_sequence.png "Resuming downloads post abort")
