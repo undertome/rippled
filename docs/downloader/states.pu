@@ -1,0 +1,91 @@
+@startuml
+
+state "Updating Database" as UD4 {
+  UD4: Update the database to reflect
+  UD4: the current state.
+}
+state "Initiating Download" as ID {
+  ID: Omit the range header to download
+  ID: the entire file.
+}
+
+state "Evaluate Database" as ED {
+  ED: Determine the current state
+  ED: based on the contents of the
+  ED: database from a previous run.
+}
+
+state "Remove Database" as RD {
+  RD: The database is destroyed when
+  RD: empty.
+}
+
+state "Download in Progress" as DP
+
+state "Updating Database" as UD2 {
+  UD2: Update the database to reflect
+  UD2: that downloads are paused.
+}
+
+state "Download Completed" as DC {
+
+  state "Updating Database" as UD {
+    UD: Update the database to reflect
+    UD: the current state.
+  }
+
+  state "Queue Check" as QC {
+    QC: Check the queue for any reamining
+    QC: downloads.
+  }
+
+  [*] --> UD
+  UD --> QC
+}
+
+state "Handle Resume" as HR {
+  HR: Determine whether or not to
+  HR: honor the resume command.
+}
+
+state "Updating Database" as UD3 {
+  UD3: Update the database to reflect
+  UD3: that downloads are not paused.
+}
+
+state "Check Resume" as CR {
+  CR: Determine whether we're resuming
+  CR: a previous download or starting a
+  CR: new one.
+}
+
+state "Resuming Download" as IPD {
+  IPD: Set the range header in the
+  IPD: HTTP request as needed.
+}
+
+[*] --> ED : State DB is present at\nnode launch
+ED --> [*] : Downloads are paused
+ED --> RD : State DB is empty
+ED --> CR : There are downloads queued and\nwe are not paused
+RD --> [*]
+
+[*] --> UD4 : Client invokes <<download_shard>>\ncommand
+UD4 --> ID : Database updated
+ID -down-> DP : Download started
+DP --> DC : Download completed
+DC -up-> ID : There **are** additional downloads\nqueued
+DP --> UD2 : Client invokes <<pause>>\ncommand
+UD2 --> [*] : Database updated
+DC --> RD : There **are no** additional\ndownloads queued
+
+[*] --> HR : Client invokes <<resume>>\ncommand
+HR --> [*] : There **are not** any\ndownloads to process
+HR --> UD3 : There **are** downloads to process
+UD3 --> CR : Database updated
+
+CR --> IPD : Resuming an interrupted\ndownload
+IPD --> DP: Download started
+CR --> ID : Initiating a new\ndownload
+
+@enduml

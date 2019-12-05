@@ -292,6 +292,12 @@ body::reader::put(ConstBufferSequence const& buffers, error_code& ec);
 
 ## Sequence Diagram
 
-This sequence diagram demonstrates a scenario wherein the `ShardArchiveHandler` leverages the state persisted on the filesystem to recover from a crash and resume the scheduled downloads.
+This sequence diagram demonstrates a scenario wherein the `ShardArchiveHandler` leverages the state persisted in the database to recover from a crash and resume the scheduled downloads.
 
 ![alt_text](./interrupt_sequence.png "Resuming downloads post abort")
+
+## State Diagram
+
+This diagram illustrates the various states of the Shard Downloader module.
+
+![alt_text](./states.png "Shard Downloader states")

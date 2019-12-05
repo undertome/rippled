@@ -46,7 +46,7 @@ skinparam note {
 }
 '/
 
-skinparam monochrome true
+'skinparam monochrome true
 
 actor Client as c
 entity RippleNode as rn
