@@ -23,29 +23,30 @@ Implementing the shard downloader improvements will require making changes to th
 
    This class uses the `SSLHTTPDownloader` to fetch shards from remote web servers. Additionally, the archive handler performs sanity checks on the downloaded files and imports the validated files into the local shard store.
 
+   The `ShardArchiveHandler` exposes a simple public interface:
+
+   ```C++
+   /** Add an archive to be downloaded and imported.
+   @param shardIndex the index of the shard to be imported.
+   @param url the location of the archive.
+   @return `true` if successfully added.
+   @note Returns false if called while downloading.
+   */
+   bool
+   add(std::uint32_t shardIndex, parsedURL&& url);
+
+   /** Starts downloading and importing archives. */
+   bool
+   start();
+   ```
+   
+   When a client submits a `download_shard` command via the RPC interface, each of the requested files is registered with the handler via the `add` method. After all the files have been registered, the handler's `start` method is invoked, which in turn creates an instance of the `SSLHTTPDownloader` and begins the first download. When the download is completed, the downloader invokes the handler's `complete` method, which will initiate the download of the next file, or simply return if there are no more downloads to process. When `complete` is invoked with no remaining files to be downloaded, the handler and downloader are destroyed automatically.
+
+Additionally, we create a new class to provide customized parsing for downloaded files:
+
 - `SQLiteBody`
 
-   This is a new class that defines a custom message body type, allowing an `http::response_parser` to write to a SQLite database rather than to a flat file. This class is discussed in further detail in the Recovery section.
-
-##### ShardArchiveHandler
-The `ShardArchiveHandler` exposes a simple public interface:
-
-```C++
-/** Add an archive to be downloaded and imported.
-    @param shardIndex the index of the shard to be imported.
-    @param url the location of the archive.
-    @return `true` if successfully added.
-    @note Returns false if called while downloading.
-*/
-bool
-add(std::uint32_t shardIndex, parsedURL&& url);
-
-/** Starts downloading and importing archives. */
-bool
-start();
-```
-
-When a client submits a `download_shard` command via the RPC interface, each of the requested files is registered with the handler via the `add` method. After all the files have been registered, the handler's `start` method is invoked, which in turn creates an instance of the `SSLHTTPDownloader` and begins the first download. When the download is completed, the downloader invokes the handler's `complete` method, which will initiate the download of the next file, or simply return if there are no more downloads to process. When `complete` is invoked with no remaining files to be downloaded, the handler and downloader are destroyed automatically.
+   This class will define a custom message body type, allowing an `http::response_parser` to write to a SQLite database rather than to a flat file. This class is discussed in further detail in the Recovery section.
 
 ## Execution Concept
 
