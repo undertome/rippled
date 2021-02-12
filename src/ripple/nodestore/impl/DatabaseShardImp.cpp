@@ -1913,6 +1913,15 @@ DatabaseShardImp::callForLedgerSQL(
     std::lock_guard lock(mutex_);
     auto shardIndex = seqToShardIndex(ledgerSeq);
 
+    return doCallForLedgerSQL(shardIndex, callback);
+}
+
+bool
+DatabaseShardImp::doCallForLedgerSQL(
+    std::uint32_t const shardIndex,
+    std::function<bool(soci::session& session, std::uint32_t index)> const&
+        callback)
+{
     if (shards_.count(shardIndex) &&
         shards_[shardIndex]->getState() == Shard::State::final)
     {
@@ -1931,6 +1940,15 @@ DatabaseShardImp::callForTransactionSQL(
     std::lock_guard lock(mutex_);
     auto shardIndex = seqToShardIndex(ledgerSeq);
 
+    return doCallForTransactionSQL(shardIndex, callback);
+}
+
+bool
+DatabaseShardImp::doCallForTransactionSQL(
+    std::uint32_t const shardIndex,
+    std::function<bool(soci::session& session, std::uint32_t index)> const&
+        callback)
+{
     if (shards_.count(shardIndex) &&
         shards_[shardIndex]->getState() == Shard::State::final)
     {

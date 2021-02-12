@@ -33,6 +33,121 @@
 namespace ripple {
 
 DatabasePair
+makeMetaDBs(
+    Config const& config,
+    DatabaseCon::Setup const& setup,
+    DatabaseCon::CheckpointerSetup const& checkpointerSetup)
+{
+    // ledger meta database
+    auto lgr{std::make_unique<DatabaseCon>(
+        setup,
+        LgrMetaDBName,
+        LgrMetaDBPragma,
+        LgrMetaDBInit,
+        checkpointerSetup)};
+
+    if (config.useTxTables())
+    {
+        // transaction meta database
+        auto tx{std::make_unique<DatabaseCon>(
+            setup,
+            TxMetaDBName,
+            TxMetaDBPragma,
+            TxMetaDBInit,
+            checkpointerSetup)};
+
+        return {std::move(lgr), std::move(tx)};
+    }
+
+    return {std::move(lgr), {}};
+}
+
+bool
+saveLedgerMeta(
+    std::shared_ptr<Ledger const> const& ledger,
+    Application& app,
+    soci::session& lgrSesh,
+    soci::session& txnSesh,
+    std::uint32_t const shardIndex)
+{
+    std::string const lgrSQL =
+        R"sql(INSERT OR REPLACE INTO LedgerMeta VALUES
+              (:ledgerHash,:shardIndex);)sql";
+
+    lgrSesh << lgrSQL, soci::use(to_string(ledger->info().hash)),
+        soci::use(shardIndex);
+
+    auto j = app.journal("Ledger");
+
+    AcceptedLedger::pointer aLedger;
+    try
+    {
+        aLedger = app.getAcceptedLedgerCache().fetch(ledger->info().hash);
+        if (!aLedger)
+        {
+            aLedger = std::make_shared<AcceptedLedger>(ledger, app);
+            app.getAcceptedLedgerCache().canonicalize_replace_client(
+                ledger->info().hash, aLedger);
+        }
+    }
+    catch (std::exception const&)
+    {
+        JLOG(j.warn()) << "An accepted ledger was missing nodes";
+        return false;
+    }
+
+    if (app.config().useTxTables())
+    {
+        soci::transaction tr(txnSesh);
+
+        for (auto const& [_, acceptedLedgerTx] : aLedger->getMap())
+        {
+            (void)_;
+
+            std::string const txnSQL =
+                R"sql(INSERT OR REPLACE INTO TransactionMeta VALUES
+                      (:transactionID,:shardIndex);)sql";
+
+            txnSesh << txnSQL,
+                soci::use(to_string(acceptedLedgerTx->getTransactionID())),
+                soci::use(shardIndex);
+        }
+
+        tr.commit();
+    }
+
+    return true;
+}
+
+std::optional<std::uint32_t>
+getShardIndexforLedger(soci::session& session, LedgerHash const& hash)
+{
+    std::uint32_t shardIndex;
+    session << "SELECT ShardIndex FROM LedgerMeta WHERE LedgerHash = '" << hash
+            << "';",
+        soci::into(shardIndex);
+
+    if (!session.got_data())
+        return std::nullopt;
+
+    return shardIndex;
+}
+
+std::optional<std::uint32_t>
+getShardIndexforTransaction(soci::session& session, TxID const& id)
+{
+    std::uint32_t shardIndex;
+    session << "SELECT ShardIndex FROM TransactionMeta WHERE TransID = '" << id
+            << "';",
+        soci::into(shardIndex);
+
+    if (!session.got_data())
+        return std::nullopt;
+
+    return shardIndex;
+}
+
+DatabasePair
 makeShardCompleteLedgerDBs(
     Config const& config,
     DatabaseCon::Setup const& setup)

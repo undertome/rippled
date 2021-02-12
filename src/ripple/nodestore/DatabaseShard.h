@@ -151,6 +151,12 @@ public:
         std::function<bool(soci::session& session, std::uint32_t index)> const&
             callback) = 0;
 
+    virtual bool
+    doCallForLedgerSQL(
+        std::uint32_t const shardIndex,
+        std::function<bool(soci::session& session, std::uint32_t index)> const&
+            callback) = 0;
+
     /**
      * @brief callForTransactionSQL Checkouts transaction database for shard
      *        containing given ledger and calls given callback function passing
@@ -162,6 +168,12 @@ public:
     virtual bool
     callForTransactionSQL(
         LedgerIndex ledgerSeq,
+        std::function<bool(soci::session& session, std::uint32_t index)> const&
+            callback) = 0;
+
+    virtual bool
+    doCallForTransactionSQL(
+        std::uint32_t const shardIndex,
         std::function<bool(soci::session& session, std::uint32_t index)> const&
             callback) = 0;
 

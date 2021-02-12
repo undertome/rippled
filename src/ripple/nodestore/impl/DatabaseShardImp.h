@@ -168,8 +168,20 @@ public:
             callback) override;
 
     bool
+    doCallForLedgerSQL(
+        std::uint32_t const shardIndex,
+        std::function<bool(soci::session& session, std::uint32_t index)> const&
+            callback) override;
+
+    bool
     callForTransactionSQL(
         LedgerIndex ledgerSeq,
+        std::function<bool(soci::session& session, std::uint32_t index)> const&
+            callback) override;
+
+    bool
+    doCallForTransactionSQL(
+        std::uint32_t const shardIndex,
         std::function<bool(soci::session& session, std::uint32_t index)> const&
             callback) override;
 
