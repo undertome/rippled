@@ -164,49 +164,57 @@ public:
     bool
     callForLedgerSQL(
         LedgerIndex ledgerSeq,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     doCallForLedgerSQL(
         std::uint32_t const shardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     callForTransactionSQL(
         LedgerIndex ledgerSeq,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     doCallForTransactionSQL(
         std::uint32_t const shardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     iterateLedgerSQLsForward(
         std::optional<std::uint32_t> minShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     iterateTransactionSQLsForward(
         std::optional<std::uint32_t> minShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     iterateLedgerSQLsBack(
         std::optional<std::uint32_t> maxShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
     bool
     iterateTransactionSQLsBack(
         std::optional<std::uint32_t> maxShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) override;
 
 private:

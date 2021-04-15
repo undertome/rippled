@@ -310,7 +310,8 @@ private:
     bool
     doLedger(
         LedgerIndex ledgerSeq,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback)
     {
         return app_.getShardStore()->callForLedgerSQL(ledgerSeq, callback);
@@ -327,7 +328,8 @@ private:
     bool
     doTransaction(
         LedgerIndex ledgerSeq,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback)
     {
         return app_.getShardStore()->callForTransactionSQL(ledgerSeq, callback);
@@ -347,7 +349,8 @@ private:
     bool
     iterateLedgerForward(
         std::optional<std::uint32_t> firstIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback)
     {
         return app_.getShardStore()->iterateLedgerSQLsForward(
@@ -368,7 +371,8 @@ private:
     bool
     iterateTransactionForward(
         std::optional<std::uint32_t> firstIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback)
     {
         return app_.getShardStore()->iterateLedgerSQLsForward(
@@ -389,7 +393,8 @@ private:
     bool
     iterateLedgerBack(
         std::optional<std::uint32_t> firstIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback)
     {
         return app_.getShardStore()->iterateLedgerSQLsBack(
@@ -410,7 +415,8 @@ private:
     bool
     iterateTransactionBack(
         std::optional<std::uint32_t> firstIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback)
     {
         return app_.getShardStore()->iterateLedgerSQLsBack(
@@ -458,10 +464,11 @@ RelationalDBInterfaceSqliteImp::getMinLedgerSeq()
 
     /* else use shard databases */
     std::optional<LedgerIndex> res;
-    iterateLedgerForward({}, [&](soci::session& session, std::uint32_t index) {
-        res = ripple::getMinLedgerSeq(session, TableType::Ledgers);
-        return !res;
-    });
+    iterateLedgerForward(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            res = ripple::getMinLedgerSeq(session, TableType::Ledgers);
+            return !res;
+        });
     return res;
 }
 
@@ -478,7 +485,7 @@ RelationalDBInterfaceSqliteImp::getTransactionsMinLedgerSeq()
     /* else use shard databases */
     std::optional<LedgerIndex> res;
     iterateTransactionForward(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             res = ripple::getMinLedgerSeq(session, TableType::Transactions);
             return !res;
         });
@@ -498,7 +505,7 @@ RelationalDBInterfaceSqliteImp::getAccountTransactionsMinLedgerSeq()
     /* else use shard databases */
     std::optional<LedgerIndex> res;
     iterateTransactionForward(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             res = ripple::getMinLedgerSeq(
                 session, TableType::AccountTransactions);
             return !res;
@@ -518,10 +525,11 @@ RelationalDBInterfaceSqliteImp::getMaxLedgerSeq()
 
     /* else use shard databases */
     std::optional<LedgerIndex> res;
-    iterateLedgerBack({}, [&](soci::session& session, std::uint32_t index) {
-        res = ripple::getMaxLedgerSeq(session, TableType::Ledgers);
-        return !res;
-    });
+    iterateLedgerBack(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            res = ripple::getMaxLedgerSeq(session, TableType::Ledgers);
+            return !res;
+        });
     return res;
 }
 
@@ -538,10 +546,12 @@ RelationalDBInterfaceSqliteImp::deleteTransactionByLedgerSeq(
     }
 
     /* else use shard database */
-    doTransaction(ledgerSeq, [&](soci::session& session, std::uint32_t index) {
-        ripple::deleteByLedgerSeq(session, TableType::Transactions, ledgerSeq);
-        return true;
-    });
+    doTransaction(
+        ledgerSeq, [&](soci::session& session, std::uint32_t shardIndex) {
+            ripple::deleteByLedgerSeq(
+                session, TableType::Transactions, ledgerSeq);
+            return true;
+        });
 }
 
 void
@@ -558,7 +568,7 @@ RelationalDBInterfaceSqliteImp::deleteBeforeLedgerSeq(LedgerIndex ledgerSeq)
     /* else use shard databases */
     iterateLedgerBack(
         seqToShardIndex(ledgerSeq),
-        [&](soci::session& session, std::uint32_t index) {
+        [&](soci::session& session, std::uint32_t shardIndex) {
             ripple::deleteBeforeLedgerSeq(
                 session, TableType::Ledgers, ledgerSeq);
             return true;
@@ -580,7 +590,7 @@ RelationalDBInterfaceSqliteImp::deleteTransactionsBeforeLedgerSeq(
     /* else use shard databases */
     iterateTransactionBack(
         seqToShardIndex(ledgerSeq),
-        [&](soci::session& session, std::uint32_t index) {
+        [&](soci::session& session, std::uint32_t shardIndex) {
             ripple::deleteBeforeLedgerSeq(
                 session, TableType::Transactions, ledgerSeq);
             return true;
@@ -603,7 +613,7 @@ RelationalDBInterfaceSqliteImp::deleteAccountTransactionsBeforeLedgerSeq(
     /* else use shard databases */
     iterateTransactionBack(
         seqToShardIndex(ledgerSeq),
-        [&](soci::session& session, std::uint32_t index) {
+        [&](soci::session& session, std::uint32_t shardIndex) {
             ripple::deleteBeforeLedgerSeq(
                 session, TableType::AccountTransactions, ledgerSeq);
             return true;
@@ -623,7 +633,7 @@ RelationalDBInterfaceSqliteImp::getTransactionCount()
     /* else use shard databases */
     std::size_t rows = 0;
     iterateTransactionForward(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             rows += ripple::getRows(session, TableType::Transactions);
             return true;
         });
@@ -643,7 +653,7 @@ RelationalDBInterfaceSqliteImp::getAccountTransactionCount()
     /* else use shard databases */
     std::size_t rows = 0;
     iterateTransactionForward(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             rows += ripple::getRows(session, TableType::AccountTransactions);
             return true;
         });
@@ -662,17 +672,18 @@ RelationalDBInterfaceSqliteImp::getLedgerCountMinMax()
 
     /* else use shard databases */
     CountMinMax res{0, 0, 0};
-    iterateLedgerForward({}, [&](soci::session& session, std::uint32_t index) {
-        auto r = ripple::getRowsMinMax(session, TableType::Ledgers);
-        if (r.numberOfRows)
-        {
-            res.numberOfRows += r.numberOfRows;
-            if (res.minLedgerSequence == 0)
-                res.minLedgerSequence = r.minLedgerSequence;
-            res.maxLedgerSequence = r.maxLedgerSequence;
-        }
-        return true;
-    });
+    iterateLedgerForward(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            auto r = ripple::getRowsMinMax(session, TableType::Ledgers);
+            if (r.numberOfRows)
+            {
+                res.numberOfRows += r.numberOfRows;
+                if (res.minLedgerSequence == 0)
+                    res.minLedgerSequence = r.minLedgerSequence;
+                res.maxLedgerSequence = r.maxLedgerSequence;
+            }
+            return true;
+        });
     return res;
 }
 
@@ -720,7 +731,7 @@ RelationalDBInterfaceSqliteImp::getLedgerInfoByIndex(LedgerIndex ledgerSeq)
 
     /* else use shard database */
     std::optional<LedgerInfo> res;
-    doLedger(ledgerSeq, [&](soci::session& session, std::uint32_t index) {
+    doLedger(ledgerSeq, [&](soci::session& session, std::uint32_t shardIndex) {
         res = ripple::getLedgerInfoByIndex(session, ledgerSeq, j_);
         return true;
     });
@@ -739,14 +750,15 @@ RelationalDBInterfaceSqliteImp::getNewestLedgerInfo()
 
     /* else use shard databases */
     std::optional<LedgerInfo> res;
-    iterateLedgerBack({}, [&](soci::session& session, std::uint32_t index) {
-        if (auto info = ripple::getNewestLedgerInfo(session, j_))
-        {
-            res = info;
-            return false;
-        }
-        return true;
-    });
+    iterateLedgerBack(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            if (auto info = ripple::getNewestLedgerInfo(session, j_))
+            {
+                res = info;
+                return false;
+            }
+            return true;
+        });
 
     return res;
 }
@@ -766,7 +778,7 @@ RelationalDBInterfaceSqliteImp::getLimitedOldestLedgerInfo(
     std::optional<LedgerInfo> res;
     iterateLedgerForward(
         seqToShardIndex(ledgerFirstIndex),
-        [&](soci::session& session, std::uint32_t index) {
+        [&](soci::session& session, std::uint32_t shardIndex) {
             if (auto info = ripple::getLimitedOldestLedgerInfo(
                     session, ledgerFirstIndex, j_))
             {
@@ -792,17 +804,16 @@ RelationalDBInterfaceSqliteImp::getLimitedNewestLedgerInfo(
 
     /* else use shard databases */
     std::optional<LedgerInfo> res;
-    iterateLedgerBack({}, [&](soci::session& session, std::uint32_t index) {
-        if (auto info = ripple::getLimitedNewestLedgerInfo(
-                session, ledgerFirstIndex, j_))
-        {
-            res = info;
-            return false;
-        }
-        if (index < seqToShardIndex(ledgerFirstIndex))
-            return false;
-        return true;
-    });
+    iterateLedgerBack(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            if (auto info = ripple::getLimitedNewestLedgerInfo(
+                    session, ledgerFirstIndex, j_))
+            {
+                res = info;
+                return false;
+            }
+            return shardIndex >= seqToShardIndex(ledgerFirstIndex);
+        });
 
     return res;
 }
@@ -827,7 +838,8 @@ RelationalDBInterfaceSqliteImp::getLedgerInfoByHash(uint256 const& ledgerHash)
                 ripple::getShardIndexforLedger(*lgrMetaSession, ledgerHash))
         {
             shardStore->doCallForLedgerSQL(
-                *shardIndex, [&](soci::session& session, std::uint32_t index) {
+                *shardIndex,
+                [&](soci::session& session, std::uint32_t shardIndex) {
                     res = ripple::getLedgerInfoByHash(session, ledgerHash, j_);
                     return false;  // unused
                 });
@@ -851,10 +863,11 @@ RelationalDBInterfaceSqliteImp::getHashByIndex(LedgerIndex ledgerIndex)
 
     /* else use shard database */
     uint256 hash;
-    doLedger(ledgerIndex, [&](soci::session& session, std::uint32_t index) {
-        hash = ripple::getHashByIndex(session, ledgerIndex);
-        return true;
-    });
+    doLedger(
+        ledgerIndex, [&](soci::session& session, std::uint32_t shardIndex) {
+            hash = ripple::getHashByIndex(session, ledgerIndex);
+            return true;
+        });
     return hash;
 }
 
@@ -870,10 +883,11 @@ RelationalDBInterfaceSqliteImp::getHashesByIndex(LedgerIndex ledgerIndex)
 
     /* else use shard database */
     std::optional<LedgerHashPair> res;
-    doLedger(ledgerIndex, [&](soci::session& session, std::uint32_t index) {
-        res = ripple::getHashesByIndex(session, ledgerIndex, j_);
-        return true;
-    });
+    doLedger(
+        ledgerIndex, [&](soci::session& session, std::uint32_t shardIndex) {
+            res = ripple::getHashesByIndex(session, ledgerIndex, j_);
+            return true;
+        });
     return res;
 }
 
@@ -896,7 +910,7 @@ RelationalDBInterfaceSqliteImp::getHashesByIndex(
         LedgerIndex shardMaxSeq = lastLedgerSeq(seqToShardIndex(minSeq));
         if (shardMaxSeq > maxSeq)
             shardMaxSeq = maxSeq;
-        doLedger(minSeq, [&](soci::session& session, std::uint32_t index) {
+        doLedger(minSeq, [&](soci::session& session, std::uint32_t shardIndex) {
             auto r = ripple::getHashesByIndex(session, minSeq, shardMaxSeq, j_);
             res.insert(r.begin(), r.end());
             return true;
@@ -921,7 +935,7 @@ RelationalDBInterfaceSqliteImp::getTxHistory(LedgerIndex startIndex)
     std::vector<std::shared_ptr<Transaction>> txs;
     int quantity = 20;
     iterateTransactionBack(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             auto [tx, total] =
                 ripple::getTxHistory(session, app_, startIndex, quantity, true);
             txs.insert(txs.end(), tx.begin(), tx.end());
@@ -964,8 +978,8 @@ RelationalDBInterfaceSqliteImp::getOldestAccountTxs(
     iterateTransactionForward(
         opt.minLedger ? seqToShardIndex(opt.minLedger)
                       : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
-            if (opt.maxLedger && index > seqToShardIndex(opt.maxLedger))
+        [&](soci::session& session, std::uint32_t shardIndex) {
+            if (opt.maxLedger && shardIndex > seqToShardIndex(opt.maxLedger))
                 return false;
             auto [r, total] = ripple::getOldestAccountTxs(
                 session, app_, ledgerMaster, opt, limit_used, j_);
@@ -1013,8 +1027,8 @@ RelationalDBInterfaceSqliteImp::getNewestAccountTxs(
     iterateTransactionBack(
         opt.maxLedger ? seqToShardIndex(opt.maxLedger)
                       : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
-            if (opt.minLedger && index < seqToShardIndex(opt.minLedger))
+        [&](soci::session& session, std::uint32_t shardIndex) {
+            if (opt.minLedger && shardIndex < seqToShardIndex(opt.minLedger))
                 return false;
             auto [r, total] = ripple::getNewestAccountTxs(
                 session, app_, ledgerMaster, opt, limit_used, j_);
@@ -1058,8 +1072,8 @@ RelationalDBInterfaceSqliteImp::getOldestAccountTxsB(
     iterateTransactionForward(
         opt.minLedger ? seqToShardIndex(opt.minLedger)
                       : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
-            if (opt.maxLedger && index > seqToShardIndex(opt.maxLedger))
+        [&](soci::session& session, std::uint32_t shardIndex) {
+            if (opt.maxLedger && shardIndex > seqToShardIndex(opt.maxLedger))
                 return false;
             auto [r, total] = ripple::getOldestAccountTxsB(
                 session, app_, opt, limit_used, j_);
@@ -1103,8 +1117,8 @@ RelationalDBInterfaceSqliteImp::getNewestAccountTxsB(
     iterateTransactionBack(
         opt.maxLedger ? seqToShardIndex(opt.maxLedger)
                       : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
-            if (opt.minLedger && index < seqToShardIndex(opt.minLedger))
+        [&](soci::session& session, std::uint32_t shardIndex) {
+            if (opt.minLedger && shardIndex < seqToShardIndex(opt.minLedger))
                 return false;
             auto [r, total] = ripple::getNewestAccountTxsB(
                 session, app_, opt, limit_used, j_);
@@ -1172,9 +1186,9 @@ RelationalDBInterfaceSqliteImp::oldestAccountTxPage(
     iterateTransactionForward(
         opt.minLedger ? seqToShardIndex(opt.minLedger)
                       : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
+        [&](soci::session& session, std::uint32_t shardIndex) {
             if (opt.maxLedger != UINT32_MAX &&
-                index > seqToShardIndex(opt.minLedger))
+                shardIndex > seqToShardIndex(opt.minLedger))
                 return false;
             auto [marker, total] = ripple::oldestAccountTxPage(
                 session,
@@ -1236,8 +1250,8 @@ RelationalDBInterfaceSqliteImp::newestAccountTxPage(
     iterateTransactionBack(
         opt.maxLedger != UINT32_MAX ? seqToShardIndex(opt.maxLedger)
                                     : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
-            if (opt.minLedger && index < seqToShardIndex(opt.minLedger))
+        [&](soci::session& session, std::uint32_t shardIndex) {
+            if (opt.minLedger && shardIndex < seqToShardIndex(opt.minLedger))
                 return false;
             auto [marker, total] = ripple::newestAccountTxPage(
                 session,
@@ -1298,9 +1312,9 @@ RelationalDBInterfaceSqliteImp::oldestAccountTxPageB(
     iterateTransactionForward(
         opt.minLedger ? seqToShardIndex(opt.minLedger)
                       : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
+        [&](soci::session& session, std::uint32_t shardIndex) {
             if (opt.maxLedger != UINT32_MAX &&
-                index > seqToShardIndex(opt.minLedger))
+                shardIndex > seqToShardIndex(opt.minLedger))
                 return false;
             auto [marker, total] = ripple::oldestAccountTxPage(
                 session,
@@ -1361,8 +1375,8 @@ RelationalDBInterfaceSqliteImp::newestAccountTxPageB(
     iterateTransactionBack(
         opt.maxLedger != UINT32_MAX ? seqToShardIndex(opt.maxLedger)
                                     : std::optional<std::uint32_t>(),
-        [&](soci::session& session, std::uint32_t index) {
-            if (opt.minLedger && index < seqToShardIndex(opt.minLedger))
+        [&](soci::session& session, std::uint32_t shardIndex) {
+            if (opt.minLedger && shardIndex < seqToShardIndex(opt.minLedger))
                 return false;
             auto [marker, total] = ripple::newestAccountTxPage(
                 session,
@@ -1405,14 +1419,15 @@ RelationalDBInterfaceSqliteImp::getTransaction(
                 ripple::getShardIndexforTransaction(*txMetaSession, id))
         {
             shardStore->doCallForTransactionSQL(
-                *shardIndex, [&](soci::session& session, std::uint32_t index) {
+                *shardIndex,
+                [&](soci::session& session, std::uint32_t shardIndex) {
                     std::optional<ClosedInterval<uint32_t>> range1;
                     if (range)
                     {
-                        uint32_t low =
-                            std::max(range->lower(), firstLedgerSeq(index));
+                        uint32_t low = std::max(
+                            range->lower(), firstLedgerSeq(shardIndex));
                         uint32_t high =
-                            std::min(range->upper(), lastLedgerSeq(index));
+                            std::min(range->upper(), lastLedgerSeq(shardIndex));
                         if (low <= high)
                             range1 = ClosedInterval<uint32_t>(low, high);
                     }
@@ -1442,7 +1457,7 @@ RelationalDBInterfaceSqliteImp::ledgerDbHasSpace(Config const& config)
 
     /* else use shard databases */
     return iterateLedgerBack(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             return ripple::dbHasSpace(session, config, j_);
         });
 }
@@ -1459,7 +1474,7 @@ RelationalDBInterfaceSqliteImp::transactionDbHasSpace(Config const& config)
 
     /* else use shard databases */
     return iterateTransactionBack(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             return ripple::dbHasSpace(session, config, j_);
         });
 }
@@ -1475,10 +1490,11 @@ RelationalDBInterfaceSqliteImp::getKBUsedAll()
 
     /* else use shard databases */
     int sum = 0;
-    iterateLedgerBack({}, [&](soci::session& session, std::uint32_t index) {
-        sum += ripple::getKBUsedAll(session);
-        return true;
-    });
+    iterateLedgerBack(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            sum += ripple::getKBUsedAll(session);
+            return true;
+        });
     return sum;
 }
 
@@ -1493,10 +1509,11 @@ RelationalDBInterfaceSqliteImp::getKBUsedLedger()
 
     /* else use shard databases */
     int sum = 0;
-    iterateLedgerBack({}, [&](soci::session& session, std::uint32_t index) {
-        sum += ripple::getKBUsedDB(session);
-        return true;
-    });
+    iterateLedgerBack(
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
+            sum += ripple::getKBUsedDB(session);
+            return true;
+        });
     return sum;
 }
 
@@ -1512,7 +1529,7 @@ RelationalDBInterfaceSqliteImp::getKBUsedTransaction()
     /* else use shard databases */
     int sum = 0;
     iterateTransactionBack(
-        {}, [&](soci::session& session, std::uint32_t index) {
+        {}, [&](soci::session& session, std::uint32_t shardIndex) {
             sum += ripple::getKBUsedDB(session);
             return true;
         });

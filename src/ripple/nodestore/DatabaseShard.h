@@ -148,13 +148,15 @@ public:
     virtual bool
     callForLedgerSQL(
         LedgerIndex ledgerSeq,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     virtual bool
     doCallForLedgerSQL(
         std::uint32_t shardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     /**
@@ -174,7 +176,8 @@ public:
     virtual bool
     doCallForTransactionSQL(
         std::uint32_t const shardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     /**
@@ -191,7 +194,8 @@ public:
     virtual bool
     iterateLedgerSQLsForward(
         std::optional<std::uint32_t> minShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     /**
@@ -208,7 +212,8 @@ public:
     virtual bool
     iterateTransactionSQLsForward(
         std::optional<std::uint32_t> minShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     /**
@@ -225,7 +230,8 @@ public:
     virtual bool
     iterateLedgerSQLsBack(
         std::optional<std::uint32_t> maxShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     /**
@@ -242,7 +248,8 @@ public:
     virtual bool
     iterateTransactionSQLsBack(
         std::optional<std::uint32_t> maxShardIndex,
-        std::function<bool(soci::session& session, std::uint32_t index)> const&
+        std::function<
+            bool(soci::session& session, std::uint32_t shardIndex)> const&
             callback) = 0;
 
     /** @return The maximum number of ledgers stored in a shard

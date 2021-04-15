@@ -1907,21 +1907,20 @@ DatabaseShardImp::checkHistoricalPaths() const
 bool
 DatabaseShardImp::callForLedgerSQL(
     LedgerIndex ledgerSeq,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
-    std::lock_guard lock(mutex_);
-    auto shardIndex = seqToShardIndex(ledgerSeq);
-
-    return doCallForLedgerSQL(shardIndex, callback);
+    return doCallForLedgerSQL(seqToShardIndex(ledgerSeq), callback);
 }
 
 bool
 DatabaseShardImp::doCallForLedgerSQL(
     std::uint32_t shardIndex,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
+    std::lock_guard lock(mutex_);
+
     if (shards_.count(shardIndex) &&
         shards_[shardIndex]->getState() == Shard::State::final)
     {
@@ -1934,21 +1933,20 @@ DatabaseShardImp::doCallForLedgerSQL(
 bool
 DatabaseShardImp::callForTransactionSQL(
     LedgerIndex ledgerSeq,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
-    std::lock_guard lock(mutex_);
-    auto shardIndex = seqToShardIndex(ledgerSeq);
-
-    return doCallForTransactionSQL(shardIndex, callback);
+    return doCallForTransactionSQL(seqToShardIndex(ledgerSeq), callback);
 }
 
 bool
 DatabaseShardImp::doCallForTransactionSQL(
     std::uint32_t const shardIndex,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
+    std::lock_guard lock(mutex_);
+
     if (shards_.count(shardIndex) &&
         shards_[shardIndex]->getState() == Shard::State::final)
     {
@@ -1985,10 +1983,11 @@ DatabaseShardImp::iterateShardsForward(
 
     return true;
 }
+
 bool
 DatabaseShardImp::iterateLedgerSQLsForward(
     std::optional<std::uint32_t> minShardIndex,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
     return iterateShardsForward(
@@ -2000,7 +1999,7 @@ DatabaseShardImp::iterateLedgerSQLsForward(
 bool
 DatabaseShardImp::iterateTransactionSQLsForward(
     std::optional<std::uint32_t> minShardIndex,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
     return iterateShardsForward(
@@ -2041,7 +2040,7 @@ DatabaseShardImp::iterateShardsBack(
 bool
 DatabaseShardImp::iterateLedgerSQLsBack(
     std::optional<std::uint32_t> maxShardIndex,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
     return iterateShardsBack(maxShardIndex, [&callback](Shard& shard) -> bool {
@@ -2052,7 +2051,7 @@ DatabaseShardImp::iterateLedgerSQLsBack(
 bool
 DatabaseShardImp::iterateTransactionSQLsBack(
     std::optional<std::uint32_t> maxShardIndex,
-    std::function<bool(soci::session& session, std::uint32_t index)> const&
+    std::function<bool(soci::session& session, std::uint32_t shardIndex)> const&
         callback)
 {
     return iterateShardsBack(maxShardIndex, [&callback](Shard& shard) -> bool {
