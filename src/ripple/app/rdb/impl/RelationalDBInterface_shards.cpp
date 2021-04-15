@@ -39,7 +39,7 @@ makeMetaDBs(
     DatabaseCon::CheckpointerSetup const& checkpointerSetup)
 {
     // ledger meta database
-    auto lgr{std::make_unique<DatabaseCon>(
+    auto lgrMetaDB{std::make_unique<DatabaseCon>(
         setup,
         LgrMetaDBName,
         LgrMetaDBPragma,
@@ -49,32 +49,32 @@ makeMetaDBs(
     if (config.useTxTables())
     {
         // transaction meta database
-        auto tx{std::make_unique<DatabaseCon>(
+        auto txMetaDB{std::make_unique<DatabaseCon>(
             setup,
             TxMetaDBName,
             TxMetaDBPragma,
             TxMetaDBInit,
             checkpointerSetup)};
 
-        return {std::move(lgr), std::move(tx)};
+        return {std::move(lgrMetaDB), std::move(txMetaDB)};
     }
 
-    return {std::move(lgr), {}};
+    return {std::move(lgrMetaDB), {}};
 }
 
 bool
 saveLedgerMeta(
     std::shared_ptr<Ledger const> const& ledger,
     Application& app,
-    soci::session& lgrSesh,
-    soci::session& txnSesh,
+    soci::session& lgrMetaSession,
+    soci::session& txnMetaSession,
     std::uint32_t const shardIndex)
 {
     std::string const lgrSQL =
         R"sql(INSERT OR REPLACE INTO LedgerMeta VALUES
               (:ledgerHash,:shardIndex);)sql";
 
-    lgrSesh << lgrSQL, soci::use(to_string(ledger->info().hash)),
+    lgrMetaSession << lgrSQL, soci::use(to_string(ledger->info().hash)),
         soci::use(shardIndex);
 
     auto j = app.journal("Ledger");
@@ -98,7 +98,7 @@ saveLedgerMeta(
 
     if (app.config().useTxTables())
     {
-        soci::transaction tr(txnSesh);
+        soci::transaction tr(txnMetaSession);
 
         for (auto const& [_, acceptedLedgerTx] : aLedger->getMap())
         {
@@ -108,7 +108,7 @@ saveLedgerMeta(
                 R"sql(INSERT OR REPLACE INTO TransactionMeta VALUES
                       (:transactionID,:shardIndex);)sql";
 
-            txnSesh << txnSQL,
+            txnMetaSession << txnSQL,
                 soci::use(to_string(acceptedLedgerTx->getTransactionID())),
                 soci::use(shardIndex);
         }

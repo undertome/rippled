@@ -196,7 +196,7 @@ private:
     Application& app_;
     beast::Journal j_;
     std::unique_ptr<DatabaseCon> lgrdb_, txdb_;
-    std::unique_ptr<DatabaseCon> lgrMetaDb_, txMetaDb_;
+    std::unique_ptr<DatabaseCon> lgrMetaDB_, txMetaDB_;
 
     /**
      * @brief makeLedgerDBs Opens node ledger and transaction databases,
@@ -437,10 +437,11 @@ RelationalDBInterfaceSqliteImp::makeMetaDBs(
     DatabaseCon::Setup const& setup,
     DatabaseCon::CheckpointerSetup const& checkpointerSetup)
 {
-    auto [lgr, tx] = ripple::makeMetaDBs(config, setup, checkpointerSetup);
+    auto [lgrMetaDB, txMetaDB] =
+        ripple::makeMetaDBs(config, setup, checkpointerSetup);
 
-    txMetaDb_ = std::move(tx);
-    lgrMetaDb_ = std::move(lgr);
+    txMetaDB_ = std::move(txMetaDB);
+    lgrMetaDB_ = std::move(lgrMetaDB);
 
     return true;
 }
@@ -690,22 +691,20 @@ RelationalDBInterfaceSqliteImp::saveValidatedLedger(
 
     if (auto shardStore = app_.getShardStore())
     {
-        auto lgrSesh = lgrMetaDb_->checkoutDb();
-        auto txSesh = txMetaDb_->checkoutDb();
-
         if (ledger->info().seq < shardStore->earliestLedgerSeq())
             return true;  // Should be set to false in the future
+
+        auto lgrMetaSession = lgrMetaDB_->checkoutDb();
+        auto txMetaSession = txMetaDB_->checkoutDb();
 
         return ripple::saveLedgerMeta(
             ledger,
             app_,
-            *lgrSesh,
-            *txSesh,
+            *lgrMetaSession,
+            *txMetaSession,
             shardStore->seqToShardIndex(ledger->info().seq));
     }
 
-    /* Todo: use shard databases. Skipped in this PR by propose of Mickey
-     * Portilla. */
     return true;
 }
 
@@ -819,16 +818,15 @@ RelationalDBInterfaceSqliteImp::getLedgerInfoByHash(uint256 const& ledgerHash)
     }
 
     /* else use shard databases */
-    if (app_.getShardStore())
+    if (auto shardStore = app_.getShardStore())
     {
         std::optional<LedgerInfo> res;
-        auto db = lgrMetaDb_->checkoutDb();
+        auto lgrMetaSession = lgrMetaDB_->checkoutDb();
 
         if (auto const shardIndex =
-                ripple::getShardIndexforLedger(*db, ledgerHash);
-            shardIndex)
+                ripple::getShardIndexforLedger(*lgrMetaSession, ledgerHash))
         {
-            app_.getShardStore()->doCallForLedgerSQL(
+            shardStore->doCallForLedgerSQL(
                 *shardIndex, [&](soci::session& session, std::uint32_t index) {
                     res = ripple::getLedgerInfoByHash(session, ledgerHash, j_);
                     return false;  // unused
@@ -1398,16 +1396,15 @@ RelationalDBInterfaceSqliteImp::getTransaction(
     }
 
     /* else use shard databases */
-    if (app_.getShardStore())
+    if (auto shardStore = app_.getShardStore())
     {
         std::variant<AccountTx, TxSearched> res(TxSearched::unknown);
-        auto db = txMetaDb_->checkoutDb();
+        auto txMetaSession = txMetaDB_->checkoutDb();
 
         if (auto const shardIndex =
-                ripple::getShardIndexforTransaction(*db, id);
-            shardIndex)
+                ripple::getShardIndexforTransaction(*txMetaSession, id))
         {
-            app_.getShardStore()->doCallForTransactionSQL(
+            shardStore->doCallForTransactionSQL(
                 *shardIndex, [&](soci::session& session, std::uint32_t index) {
                     std::optional<ClosedInterval<uint32_t>> range1;
                     if (range)

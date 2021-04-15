@@ -1918,7 +1918,7 @@ DatabaseShardImp::callForLedgerSQL(
 
 bool
 DatabaseShardImp::doCallForLedgerSQL(
-    std::uint32_t const shardIndex,
+    std::uint32_t shardIndex,
     std::function<bool(soci::session& session, std::uint32_t index)> const&
         callback)
 {

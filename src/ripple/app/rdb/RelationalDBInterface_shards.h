@@ -57,8 +57,8 @@ makeMetaDBs(
  *        (ledger hash -> shard index) mappings in the meta databases.
  * @param ledger The ledger.
  * @param app Application object.
- * @param lgrSesh Session to ledger meta database.
- * @param txnSesh Session to transaction meta database.
+ * @param lgrMetaSession Session to ledger meta database.
+ * @param txnMetaSession Session to transaction meta database.
  * @param shardIndex The index of the shard that contains this ledger.
  * @return True on success.
  */
@@ -66,8 +66,8 @@ bool
 saveLedgerMeta(
     std::shared_ptr<Ledger const> const& ledger,
     Application& app,
-    soci::session& lgrSesh,
-    soci::session& txnSesh,
+    soci::session& lgrMetaSession,
+    soci::session& txnMetaSession,
     std::uint32_t const shardIndex);
 
 /**
