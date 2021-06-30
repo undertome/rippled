@@ -32,7 +32,6 @@
 #include <ripple/overlay/predicates.h>
 #include <ripple/protocol/HashPrefix.h>
 #include <ripple/protocol/digest.h>
-#include <ripple/rpc/impl/Handler.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -1267,7 +1266,10 @@ DatabaseShardImp::startNodeToShard()
 
     startDatabaseImportThread(lock);
 
-    return RPC::makeObjectValue("Database import initiated...");
+    Json::Value result(Json::objectValue);
+    result[jss::message] = "Database import initiated...";
+
+    return result;
 }
 
 Json::Value
@@ -1286,7 +1288,10 @@ DatabaseShardImp::stopNodeToShard()
 
     haltDatabaseImport_ = true;
 
-    return RPC::makeObjectValue("Database import halt initiated...");
+    Json::Value result(Json::objectValue);
+    result[jss::message] = "Database import halt initiated...";
+
+    return result;
 }
 
 std::optional<std::uint32_t>
