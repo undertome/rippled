@@ -61,6 +61,26 @@ public:
             env.close();
         }
 
+        auto shardStore = env.app().getShardStore();
+        BEAST_EXPECT(shardStore);
+
+        auto importCompleted = [shardStore, this](auto const& result) {
+            auto const info = shardStore->getShardInfo();
+
+            // Assume completed if the import isn't running
+            auto const completed =
+                result[jss::error_message] == "Database import not running";
+
+            if (completed)
+            {
+                BEAST_EXPECT(
+                    info->incomplete().size() + info->finalized().size() ==
+                    numberOfShards);
+            }
+
+            return completed;
+        };
+
         {
             // Initiate a shard store import via the RPC
             // interface.
@@ -75,6 +95,12 @@ public:
                 result[jss::message] == "Database import initiated...");
         }
 
+        while (!shardStore->getDatabaseImportSequence())
+        {
+            // Wait until the import starts
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
         {
             // Verify that the import is in progress with
             // the node_to_shard status RPC command
@@ -85,10 +111,8 @@ public:
             auto const result = env.rpc(
                 "json", "node_to_shard", to_string(jvParams))[jss::result];
 
-            BEAST_EXPECT(result[jss::status] == "success");
-
-            auto shardStore = env.app().getShardStore();
-            BEAST_EXPECT(shardStore);
+            BEAST_EXPECT(
+                result[jss::status] == "success" || importCompleted(result));
 
             std::chrono::seconds const maxWait{30};
             auto const start = std::chrono::system_clock::now();
@@ -108,8 +132,11 @@ public:
                         "node_to_shard",
                         to_string(jvParams))[jss::result];
 
-                    BEAST_EXPECT(result[jss::firstShardIndex] == 1);
-                    BEAST_EXPECT(result[jss::lastShardIndex] == 10);
+                    if (!importCompleted(result))
+                    {
+                        BEAST_EXPECT(result[jss::firstShardIndex] == 1);
+                        BEAST_EXPECT(result[jss::lastShardIndex] == 10);
+                    }
                 }
 
                 if (boost::icl::contains(completeShards, 1))
@@ -119,7 +146,10 @@ public:
                         "node_to_shard",
                         to_string(jvParams))[jss::result];
 
-                    BEAST_EXPECT(result[jss::currentShardIndex] >= 1);
+                    BEAST_EXPECT(
+                        result[jss::currentShardIndex] >= 1 ||
+                        importCompleted(result));
+
                     break;
                 }
 
@@ -139,8 +169,7 @@ public:
                 if (std::this_thread::sleep_for(std::chrono::milliseconds{100});
                     std::chrono::system_clock::now() - start > maxWait)
                 {
-                    BEAST_EXPECTS(
-                        false, "Import timeout: could just be a slow machine.");
+                    BEAST_EXPECT(importCompleted(result));
                     break;
                 }
             }
@@ -178,6 +207,26 @@ public:
             env.close();
         }
 
+        auto shardStore = env.app().getShardStore();
+        BEAST_EXPECT(shardStore);
+
+        auto importCompleted = [shardStore, this](auto const& result) {
+            auto const info = shardStore->getShardInfo();
+
+            // Assume completed if the import isn't running
+            auto const completed =
+                result[jss::error_message] == "Database import not running";
+
+            if (completed)
+            {
+                BEAST_EXPECT(
+                    info->incomplete().size() + info->finalized().size() ==
+                    numberOfShards);
+            }
+
+            return completed;
+        };
+
         {
             // Initiate a shard store import via the RPC
             // interface.
@@ -202,10 +251,8 @@ public:
             auto const result = env.rpc(
                 "json", "node_to_shard", to_string(jvParams))[jss::result];
 
-            BEAST_EXPECT(result[jss::status] == "success");
-
-            auto shardStore = env.app().getShardStore();
-            BEAST_EXPECT(shardStore);
+            BEAST_EXPECT(
+                result[jss::status] == "success" || importCompleted(result));
 
             std::chrono::seconds const maxWait{10};
             auto const start = std::chrono::system_clock::now();
@@ -232,7 +279,8 @@ public:
                 "json", "node_to_shard", to_string(jvParams))[jss::result];
 
             BEAST_EXPECT(
-                result[jss::message] == "Database import halt initiated...");
+                result[jss::message] == "Database import halt initiated..." ||
+                importCompleted(result));
         }
 
         std::chrono::seconds const maxWait{10};
